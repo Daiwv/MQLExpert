@@ -7,4 +7,3 @@
 #property link      "https://www.mql5.com"
 #property strict
 
-#include <KrishaObject.mqh>

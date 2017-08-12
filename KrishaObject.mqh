@@ -22,6 +22,7 @@ class Price
          low = alow;
          close = aclose;
       }
+      void Price() {}
       Price(const Price &price) { }
       Price operator=(const Price &price) { return this; }
       ~Price(void) { }
@@ -57,4 +58,14 @@ class Price
             return NormalizeDouble(MathAbs(low - close), 5);
          }
       }
+
+      bool IsBearCandle()
+      {
+         return open > close;
+      }
+
+      bool IsBullCandle()
+      {
+         return close > open;
+      }      
 };

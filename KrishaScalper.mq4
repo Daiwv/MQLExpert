@@ -9,10 +9,11 @@
 #property strict
 
 #include <KrishaLib.mqh>
+#include <KrishaObject.mqh>
 
 const string   EA_NAME = "KrishaScalper v0.1";
 const int      MAGIC_NUMBER = 20160811;
-const int      CANDLE_BODY_RATIO = 60;
+const int      CANDLE_BODY_RATIO = 55;
 
 extern double  init_lot_size = 0.01;
 extern int     slow_ma = 20;
@@ -27,6 +28,7 @@ double         v_fast_ma;
 double         v_bband;
 double         v_uband;
 double         v_lband;
+Price          *closed_price;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -106,27 +108,47 @@ void TradeLogic()
    double high = NormalizeDouble(iHigh(NULL, 0, 1),5);
    double low = NormalizeDouble(iLow(NULL, 0, 1),5);
    double close = NormalizeDouble(iClose(NULL, 0, 1),5);
-   
-   Price closed_price(open, high, low, close);   
+
+   closed_price = new Price(open, high, low, close);   
 
    v_fast_ma = NormalizeDouble(iMA(NULL, 0, fast_ma, 0, MODE_SMA, PRICE_CLOSE, 0), 4);
    v_bband = NormalizeDouble(iBands(NULL, 0, slow_ma, std_deviation, 0, PRICE_CLOSE, MODE_MAIN, 0), 4);
    v_uband = NormalizeDouble(iBands(NULL, 0, slow_ma, std_deviation, 0, PRICE_CLOSE, MODE_UPPER, 0), 4);
    v_lband = NormalizeDouble(iBands(NULL, 0, slow_ma, std_deviation, 0, PRICE_CLOSE, MODE_LOWER, 0), 4);
-   
-   Print("Get Open: ", closed_price.open);
-   //Print("Fast MA: ", v_fast_ma, " BBands: ", v_bband, " UBands: ", v_uband, " LBands: ", v_lband, " Body Wick: ", closed_price.GetBodyWickRatio());
+
+   //Print("Is Bear Candle: ", closed_price.IsBearCandle(), ", Is Bull Candle: ", closed_price.IsBullCandle());
 
    /* Only trade when candle is greater then wick */
    if (closed_price.GetBodyWickRatio() >= CANDLE_BODY_RATIO)
    {
-      // Check distance between previous candle close to fast MA
+      // 1. Check distance between previous candle close to fast MA
       //    If it is greater then X (to be defined), then don't jump to trade
       //    Otherwise, jump to trade if open to close cross MA
-      Print("Trade logic here");
+      // 2. Detect reversal pattern above/below sma and near std deviation. There should be proper candle on previous shift
+      
+      if (closed_price.open > v_bband && closed_price.close < v_bband)
+      {
+         // Check if body/tail touch lower std deviation
+         if (closed_price.low < v_lband || closed_price.close < v_lband) {
+            Print("--- No Short Trade due to touching lower STD Devication ---");
+         }
+         else {
+            Print("--- Potential Short ---");
+         }
+      }
+      else if (closed_price.open < v_bband && closed_price.close > v_bband)
+      {
+         // Check if body/tail touch upper std deviation
+         if (closed_price.high > v_uband || closed_price.close > v_uband) {
+            Print("--- No Long Trade due to touching upper STD Devication ---");
+         }
+         else {
+            Print("--- Potential Long ---");
+         }
+      }
    }
    else
    {
-      Print("Too much rejection");
+      //Print("Too much rejection");
    }
 }
