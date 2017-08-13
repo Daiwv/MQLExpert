@@ -18,13 +18,13 @@ int OpenBuyOrder(double lot_size, int magic_number, int stop_loss_pts, int take_
 
    if (stop_loss_pts > 0)
    {
-      stop_loss=NormalizeDouble(Bid-minstoplevel*Point,Digits);
+      stop_loss = NormalizeDouble(Bid - stop_loss_pts * Point, Digits);
       comment = comment + " with SL at " + string(stop_loss);
    }
-   
+
    if (take_profit_pts > 0)
    {
-      take_profit=NormalizeDouble(Bid+minstoplevel*Point,Digits);
+      take_profit = NormalizeDouble(Bid + take_profit_pts * Point, Digits);
       comment = comment + " with TP at " + string(take_profit);
    }
 
@@ -39,17 +39,17 @@ int OpenSellOrder(double lot_size, int magic_number, int stop_loss_pts, int take
    double minstoplevel=MarketInfo(Symbol(),MODE_STOPLEVEL);
    double stop_loss = 0;
    double take_profit = 0;
-   string comment = "Sell market order " + Symbol() + " at " + string(Bid) + "for " + string(lot_size);
+   string comment = "Sell market order " + Symbol() + " at " + string(Bid) + " for " + string(lot_size);
 
    if (stop_loss_pts > 0)
    {
-      stop_loss = NormalizeDouble(Ask+minstoplevel*Point,Digits);
+      stop_loss = NormalizeDouble(Ask + stop_loss_pts * Point, Digits);
       comment = comment + " with SL at " + string(stop_loss);
    }
    
    if (take_profit_pts > 0)
    {
-      take_profit = NormalizeDouble(Ask-minstoplevel*Point,Digits);
+      take_profit = NormalizeDouble(Ask - stop_loss_pts * Point, Digits);
       comment = comment + " with TP at " + string(take_profit);
    }
 
