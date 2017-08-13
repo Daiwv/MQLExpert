@@ -24,11 +24,9 @@ extern int     max_loss_pts = 100;
 extern int     max_profit_before_trail_pts = 200;
 
 int            bars_onchart;
-double         v_fast_ma;
-double         v_bband;
-double         v_uband;
-double         v_lband;
 Price          *closed_price;
+double         current_fast_ma;
+double         current_sar;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -111,44 +109,11 @@ void TradeLogic()
 
    closed_price = new Price(open, high, low, close);   
 
-   v_fast_ma = NormalizeDouble(iMA(NULL, 0, fast_ma, 0, MODE_SMA, PRICE_CLOSE, 0), 4);
-   v_bband = NormalizeDouble(iBands(NULL, 0, slow_ma, std_deviation, 0, PRICE_CLOSE, MODE_MAIN, 0), 4);
-   v_uband = NormalizeDouble(iBands(NULL, 0, slow_ma, std_deviation, 0, PRICE_CLOSE, MODE_UPPER, 0), 4);
-   v_lband = NormalizeDouble(iBands(NULL, 0, slow_ma, std_deviation, 0, PRICE_CLOSE, MODE_LOWER, 0), 4);
+   current_fast_ma = NormalizeDouble(iMA(NULL, 0, 50, 0, MODE_SMA, PRICE_CLOSE, 0), 5);
+   current_sar = NormalizeDouble(iSAR(NULL, 0, 0.02, 0.2, 0), 5);
+   
+   Print("Fast MA: ",current_fast_ma,", SAR: ", current_sar);
 
-   //Print("Is Bear Candle: ", closed_price.IsBearCandle(), ", Is Bull Candle: ", closed_price.IsBullCandle());
-
-   /* Only trade when candle is greater then wick */
-   if (closed_price.GetBodyWickRatio() >= CANDLE_BODY_RATIO)
-   {
-      // 1. Check distance between previous candle close to fast MA
-      //    If it is greater then X (to be defined), then don't jump to trade
-      //    Otherwise, jump to trade if open to close cross MA
-      // 2. Detect reversal pattern above/below sma and near std deviation. There should be proper candle on previous shift
-      
-      if (closed_price.open > v_bband && closed_price.close < v_bband)
-      {
-         // Check if body/tail touch lower std deviation
-         if (closed_price.low < v_lband || closed_price.close < v_lband) {
-            Print("--- No Short Trade due to touching lower STD Devication ---");
-         }
-         else {
-            Print("--- Potential Short ---");
-         }
-      }
-      else if (closed_price.open < v_bband && closed_price.close > v_bband)
-      {
-         // Check if body/tail touch upper std deviation
-         if (closed_price.high > v_uband || closed_price.close > v_uband) {
-            Print("--- No Long Trade due to touching upper STD Devication ---");
-         }
-         else {
-            Print("--- Potential Long ---");
-         }
-      }
-   }
-   else
-   {
-      //Print("Too much rejection");
-   }
+   OpenBuyOrder(init_lot_size, MAGIC_NUMBER, 50, 50);
+   OpenSellOrder(init_lot_size, MAGIC_NUMBER, 50, 50);
 }
