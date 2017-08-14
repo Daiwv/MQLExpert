@@ -49,7 +49,7 @@ int OpenSellOrder(double lot_size, int magic_number, int stop_loss_pts, int take
    
    if (take_profit_pts > 0)
    {
-      take_profit = NormalizeDouble(Ask - stop_loss_pts * Point, Digits);
+      take_profit = NormalizeDouble(Ask - take_profit_pts * Point, Digits);
       comment = comment + " with TP at " + string(take_profit);
    }
 

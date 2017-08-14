@@ -13,20 +13,16 @@
 
 const string   EA_NAME = "KrishaScalper v0.1";
 const int      MAGIC_NUMBER = 20160811;
-const int      CANDLE_BODY_RATIO = 55;
 
+extern int     acceptable_candle_body_ratio = 55;
 extern double  init_lot_size = 0.01;
-extern int     slow_ma = 20;
-extern int     fast_ma = 10;
-extern double  std_deviation = 2.5;
+extern int     moving_average = 50;
 extern double  partial_profit_percentage = 0.7;
 extern int     max_loss_pts = 100;
 extern int     max_profit_before_trail_pts = 200;
 
 int            bars_onchart;
 Price          *closed_price;
-double         current_fast_ma;
-double         current_sar;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -71,14 +67,9 @@ void OnTick()
 //+------------------------------------------------------------------+
 bool ValidateInput()
 {
-   if (fast_ma > slow_ma)
+   if (moving_average < 0)
    {
-      Print("Fast MA must be lower then Slow MA");
-      return false;
-   }
-   if (fast_ma < 0 || slow_ma < 0)
-   {
-      Print("Fast MA or Slow MA must be a positive number");
+      Print("Moving average must be a positive inter");
       return false;
    }
    if (partial_profit_percentage > 1 || partial_profit_percentage < 0) 
@@ -96,6 +87,11 @@ bool ValidateInput()
       Print("Initial lot size must be a postive double");
       return false;
    }
+   if (acceptable_candle_body_ratio < 0 || acceptable_candle_body_ratio > 100)
+   {
+      Print("Candle's body ratio must be within range of 0 to 100");
+      return false;
+   }
 
    return true;
 }
@@ -106,14 +102,19 @@ void TradeLogic()
    double high = NormalizeDouble(iHigh(NULL, 0, 1),5);
    double low = NormalizeDouble(iLow(NULL, 0, 1),5);
    double close = NormalizeDouble(iClose(NULL, 0, 1),5);
+   double ma = NormalizeDouble(iMA(NULL, 0, moving_average, 0, MODE_SMA, PRICE_CLOSE, 0), 5);
 
-   closed_price = new Price(open, high, low, close);   
+   closed_price = new Price(open, high, low, close);
 
-   current_fast_ma = NormalizeDouble(iMA(NULL, 0, 50, 0, MODE_SMA, PRICE_CLOSE, 0), 5);
-   current_sar = NormalizeDouble(iSAR(NULL, 0, 0.02, 0.2, 0), 5);
-   
-   Print("Fast MA: ",current_fast_ma,", SAR: ", current_sar);
-
-   OpenBuyOrder(init_lot_size, MAGIC_NUMBER, 50, 50);
-   OpenSellOrder(init_lot_size, MAGIC_NUMBER, 50, 50);
+   if (closed_price.GetBodyWickRatio() >= acceptable_candle_body_ratio)
+   {
+      if (closed_price.open > ma && closed_price.close < ma)
+      {
+         OpenSellOrder(init_lot_size, MAGIC_NUMBER, max_loss_pts, max_profit_before_trail_pts);
+      }
+      else if (closed_price.open < ma && closed_price.close > ma)
+      {
+         OpenBuyOrder(init_lot_size, MAGIC_NUMBER, max_loss_pts, max_profit_before_trail_pts);
+      }
+   }
 }
