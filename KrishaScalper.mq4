@@ -13,13 +13,11 @@
 
 const string   EA_NAME = "KrishaScalper v0.1";
 const int      MAGIC_NUMBER = 20160811;
+const int      DIGIT = int(MarketInfo(Symbol(), MODE_DIGITS));
 
-extern int     acceptable_candle_body_ratio = 55;
 extern double  init_lot_size = 0.01;
-extern int     moving_average = 50;
-extern double  partial_profit_percentage = 0.7;
 extern int     max_loss_pts = 100;
-extern int     max_profit_before_trail_pts = 200;
+extern int     max_spread_pts = 10;
 
 int            bars_onchart;
 Price          *closed_price;
@@ -67,54 +65,29 @@ void OnTick()
 //+------------------------------------------------------------------+
 bool ValidateInput()
 {
-   if (moving_average < 0)
-   {
-      Print("Moving average must be a positive inter");
-      return false;
-   }
-   if (partial_profit_percentage > 1 || partial_profit_percentage < 0) 
-   {
-      Print("Partial lot percentage must be postive and less then or equal to 1");
-      return false;
-   }
-   if (max_loss_pts < 0 || max_profit_before_trail_pts < 0)
-   {
-      Print("Max loss/profit before trail points must be a positive integer");
-      return false;
-   }
-   if (init_lot_size < 0)
-   {
-      Print("Initial lot size must be a postive double");
-      return false;
-   }
-   if (acceptable_candle_body_ratio < 0 || acceptable_candle_body_ratio > 100)
-   {
-      Print("Candle's body ratio must be within range of 0 to 100");
-      return false;
-   }
 
    return true;
 }
 
 void TradeLogic()
-{      
-   double open = NormalizeDouble(iOpen(NULL, 0, 1),5);
-   double high = NormalizeDouble(iHigh(NULL, 0, 1),5);
-   double low = NormalizeDouble(iLow(NULL, 0, 1),5);
-   double close = NormalizeDouble(iClose(NULL, 0, 1),5);
-   double ma = NormalizeDouble(iMA(NULL, 0, moving_average, 0, MODE_SMA, PRICE_CLOSE, 0), 5);
-
-   closed_price = new Price(open, high, low, close);
-
-   if (closed_price.GetBodyWickRatio() >= acceptable_candle_body_ratio)
+{
+   int spread = int(NormalizeDouble(MathPow(10, DIGIT) * MathAbs(Ask - Bid), 0));
+   double up = iCustom(NULL, 0, "PIERCE", 51, 60, 25, 0, 1);
+   double down = iCustom(NULL, 0, "PIERCE", 51, 60, 25, 1, 1);
+   string print = "Spread " + string(spread);
+   
+   if (up != EMPTY_VALUE)
    {
-      if (closed_price.open > ma && closed_price.close < ma)
-      {
-         OpenSellOrder(init_lot_size, MAGIC_NUMBER, max_loss_pts, max_profit_before_trail_pts);
-      }
-      else if (closed_price.open < ma && closed_price.close > ma)
-      {
-         OpenBuyOrder(init_lot_size, MAGIC_NUMBER, max_loss_pts, max_profit_before_trail_pts);
-      }
+      print += " Up " + string(up);
    }
+   else if (down != EMPTY_VALUE)
+   {
+      print += " Down " + string(down);
+   }
+   
+   if (print != "")
+   {
+      Print(print);
+   }
+   
 }
