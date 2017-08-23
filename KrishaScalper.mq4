@@ -11,19 +11,22 @@
 #include <KrishaLib.mqh>
 #include <KrishaObject.mqh>
 
-const string   EA_NAME = "KrishaScalper v0.1";
-const int      MAGIC_NUMBER = 20160811;
-const int      DIGIT = int(MarketInfo(Symbol(), MODE_DIGITS));
+const string      EA_NAME = "KrishaScalper v0.1";
+const int         MAGIC_NUMBER = 20160811;
+const int         DIGIT = int(MarketInfo(Symbol(), MODE_DIGITS));
 
-extern double  InitLotSize = 0.01;
-extern int     MaxLossPts = 100;
-extern int     MaxTradeSpreadPts = 10;
-input int      AllowTradeFrom = NULL;
-input int      AllowTradeUntil = NULL;
-input bool     IsECNBroker = true;
+extern double     InitLotSize = 0.01;
+extern int        MaxLossPts = 100;
+extern int        MaxTradeSpreadPts = 10;
+input tradeHour   AllowTradeFrom = HOUR_0;
+input tradeHour   AllowTradeUntil = HOUR_0;
+input bool        IsECNBroker = true;
+input double      MinPiercePenetration=51.0;
+input double      MinBodySize=60.0;
+input double      MaxPinbarSize=25.0;
 
-int            bars_onchart;
-Price          *closed_price;
+int               bars_onchart;
+Price             *closed_price;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -74,7 +77,33 @@ bool ValidateInput()
 void TradeLogic()
 {
    int spread = GetSpread();
-   double up = iCustom(NULL, 0, "PIERCE", 51, 60, 25, 0, 1);
-   double down = iCustom(NULL, 0, "PIERCE", 51, 60, 25, 1, 1);
-   string print = "";
+   double up = iCustom(NULL, 0, "PIERCE", MinPiercePenetration, MinBodySize, MaxPinbarSize, 0, 1);
+   double down = iCustom(NULL, 0, "PIERCE", MinPiercePenetration, MinBodySize, MaxPinbarSize, 1, 1);
+   bool canOpenOrder = false;
+
+   if (AllowTradeFrom == HOUR_0 && AllowTradeUntil == HOUR_0) // Can open trade anytime
+   {
+      canOpenOrder = true;
+   }
+   else // Limited to specific time only
+   {
+      int hour = Hour();
+      
+      if (hour >= AllowTradeFrom && hour < AllowTradeUntil)
+      {
+         canOpenOrder = true;
+      }
+   }
+   
+   if (canOpenOrder)
+   {
+      if (up != EMPTY_VALUE)
+      {
+         OpenOrder(Sell, IsECNBroker, InitLotSize, MAGIC_NUMBER, MaxLossPts, MaxLossPts);
+      }
+      else if (down != EMPTY_VALUE)
+      {
+         OpenOrder(Buy, IsECNBroker, InitLotSize, MAGIC_NUMBER, MaxLossPts, MaxLossPts); 
+      }
+   }
 }
