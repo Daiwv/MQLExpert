@@ -15,9 +15,12 @@ const string   EA_NAME = "KrishaScalper v0.1";
 const int      MAGIC_NUMBER = 20160811;
 const int      DIGIT = int(MarketInfo(Symbol(), MODE_DIGITS));
 
-extern double  init_lot_size = 0.01;
-extern int     max_loss_pts = 100;
-extern int     max_spread_pts = 10;
+extern double  InitLotSize = 0.01;
+extern int     MaxLossPts = 100;
+extern int     MaxTradeSpreadPts = 10;
+input int      AllowTradeFrom = NULL;
+input int      AllowTradeUntil = NULL;
+input bool     IsECNBroker = true;
 
 int            bars_onchart;
 Price          *closed_price;
@@ -65,29 +68,13 @@ void OnTick()
 //+------------------------------------------------------------------+
 bool ValidateInput()
 {
-
    return true;
 }
 
 void TradeLogic()
 {
-   int spread = int(NormalizeDouble(MathPow(10, DIGIT) * MathAbs(Ask - Bid), 0));
+   int spread = GetSpread();
    double up = iCustom(NULL, 0, "PIERCE", 51, 60, 25, 0, 1);
    double down = iCustom(NULL, 0, "PIERCE", 51, 60, 25, 1, 1);
-   string print = "Spread " + string(spread);
-   
-   if (up != EMPTY_VALUE)
-   {
-      print += " Up " + string(up);
-   }
-   else if (down != EMPTY_VALUE)
-   {
-      print += " Down " + string(down);
-   }
-   
-   if (print != "")
-   {
-      Print(print);
-   }
-   
+   string print = "";
 }
