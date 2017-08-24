@@ -15,9 +15,9 @@ const string      EA_NAME = "KrishaScalper v0.1";
 const int         MAGIC_NUMBER = 20160811;
 const int         DIGIT = int(MarketInfo(Symbol(), MODE_DIGITS));
 
-extern double     InitLotSize = 0.01;
-extern int        MaxLossPts = 100;
-extern int        MaxTradeSpreadPts = 10;
+input double      InitLotSize = 0.01;
+input int         MaxLossPts = 100;
+input int         MaxTradeSpreadPts = 10;
 input tradeHour   AllowTradeFrom = HOUR_0;
 input tradeHour   AllowTradeUntil = HOUR_0;
 input bool        IsECNBroker = true;
@@ -70,7 +70,7 @@ void OnTick()
 //| Custom function for any input validation                         |
 //+------------------------------------------------------------------+
 bool ValidateInput()
-{
+{ 
    return true;
 }
 
