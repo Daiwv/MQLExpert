@@ -9,7 +9,6 @@
 #property strict
 
 #include <OrderLib.mqh>
-#include <PriceClass.mqh>
 
 const string      EA_NAME = "KrishaScalper v0.1";
 const int         MAGIC_NUMBER = 20160811;
@@ -19,7 +18,6 @@ input bool        UseMoneyManagement = false;
 input double      FixedStaticLotSize = 0.01;
 input int         MaxTradeSpreadPts = 10;
 input int         MaxLossPts = 100;
-input int         TrailStopActivatePts = 200;
 input int         TrailStep = 10;
 
 sinput string     TradingHour;
@@ -33,9 +31,12 @@ sinput string     IndicatorSettings;
 input double      MinPiercePenetration=51.0;
 input double      MinBodySize=60.0;
 input double      MaxPinbarSize=25.0;
+input int         ATRPeriod=14;
 
 int               buyOrderTicket = 0;
 int               sellOrderTicket = 0;
+int               buyOrderStopLossPts = 0;
+int               sellOrderStopLossPts = 0;
 int               bars_onchart;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -79,16 +80,7 @@ void OnTick()
      {
          if (OrdersTotal() > 0)
          {
-            bool orderSelected = false;
-
-            if (buyOrderTicket > 0)
-            {
-               orderSelected = OrderSelect(buyOrderTicket, SELECT_BY_TICKET);
-            }
-            if (sellOrderTicket > 0)
-            {
-               orderSelected = OrderSelect(sellOrderTicket, SELECT_BY_TICKET);
-            }
+            OpenOrderLogic();       
          }
 
          return;
@@ -101,6 +93,56 @@ void OnTick()
 bool ValidateInput()
 {
    return true;
+}
+
+void OpenOrderLogic()
+{
+   bool orderSelected = false;
+   int ticket = 0;
+
+   if (buyOrderTicket > 0)
+   {
+      ticket = buyOrderTicket;
+   }
+
+   if (sellOrderTicket > 0)
+   {
+      ticket = sellOrderTicket;
+   }
+
+   if (ticket > 0)
+   {
+      orderSelected = OrderSelect(ticket, SELECT_BY_TICKET);
+
+      if (orderSelected)
+      {
+         /**
+         * Move stop loss to open price if profit already hits stop loss pts
+         */
+         if (OrderType() == OP_BUY)
+         {
+            int currentDistance = GetDistanceInPoints(Bid, OrderOpenPrice());
+
+            if (currentDistance > sellOrderStopLossPts && OrderStopLoss() != OrderOpenPrice())
+            {
+               ModifyOrder(buyOrderTicket, OrderOpenPrice(), 0);
+            }
+         }
+         else if (OrderType() == OP_SELL)
+         {
+            int currentDistance = GetDistanceInPoints(OrderOpenPrice(), Ask);
+         
+            if (currentDistance > sellOrderStopLossPts && OrderStopLoss() != OrderOpenPrice())
+            {
+               ModifyOrder(sellOrderTicket, OrderOpenPrice(), 0);
+            }
+         }
+      }
+      else
+      {
+         Print("Order cannot be selected from OpenOrderLogic with ", GetLastError());
+      }
+   }
 }
 
 void TradeLogic()
@@ -126,13 +168,26 @@ void TradeLogic()
    
    if (canOpenOrder)
    {
+      /**
+       * Stop loss is being calculated from previous high/low + X-period ATR
+       * - if calculated SL is smaller then max loss pts, use calculated SL
+       * - if calculated SL is greater then max loss pts, use max loss pts
+       */
       if (up != EMPTY_VALUE)
       {
-         sellOrderTicket = OpenOrder(Sell, IsECNBroker, FixedStaticLotSize, MAGIC_NUMBER, MaxLossPts, 0);
+         double highest = High[1] > High[2] ? High[1] : High[2];
+         int tempStopLossPts = GetDistanceInPoints(highest + iATR(NULL, 0, ATRPeriod, 0), Bid, true);
+         sellOrderStopLossPts = tempStopLossPts < MaxLossPts ? tempStopLossPts : MaxLossPts;
+
+         sellOrderTicket = OpenOrder(Sell, IsECNBroker, FixedStaticLotSize, MAGIC_NUMBER, sellOrderStopLossPts, 0);
       }
       else if (down != EMPTY_VALUE)
       {
-         buyOrderTicket = OpenOrder(Buy, IsECNBroker, FixedStaticLotSize, MAGIC_NUMBER, MaxLossPts, 0); 
+         double lowest = Low[1] < Low[2] ? Low[1] : Low[2];
+         int tempStopLossPts = GetDistanceInPoints(Ask, lowest - iATR(NULL, 0, ATRPeriod, 0), true);
+         buyOrderStopLossPts = tempStopLossPts < MaxLossPts ? tempStopLossPts : MaxLossPts;
+
+         buyOrderTicket = OpenOrder(Buy, IsECNBroker, FixedStaticLotSize, MAGIC_NUMBER, buyOrderStopLossPts, 0); 
       }
    }
 }
