@@ -15,7 +15,8 @@ const int         MAGIC_NUMBER = 20160811;
 
 sinput string     TradeManagement;
 input bool        UseMoneyManagement = false;
-input double      FixedStaticLotSize = 0.01;
+input double      FixedStaticLotSize = 0.1;
+input double      PartialClosePercent = 60.0;
 input int         MaxTradeSpreadPts = 10;
 input int         MaxLossPts = 100;
 input int         TrailStep = 10;
@@ -28,7 +29,7 @@ sinput string     BrokerInformation;
 input bool        IsECNBroker = true;
 
 sinput string     IndicatorSettings;
-input double      MinPiercePenetration=51.0;
+input double      MinPiercePenetration=50.0;
 input double      MinBodySize=60.0;
 input double      MaxPinbarSize=25.0;
 input int         ATRPeriod=14;
@@ -70,7 +71,7 @@ void OnTick()
      {
          bars_onchart=iBars(NULL,0);
 
-         if (OrdersTotal() == 0)
+         if (GetTotalOrderCount(Symbol(), MAGIC_NUMBER) == 0)
          {
             CheckOpenOrder();
             TradeLogic();
@@ -78,7 +79,7 @@ void OnTick()
      }
    else
      {
-         if (OrdersTotal() > 0)
+         if (GetTotalOrderCount(Symbol(), MAGIC_NUMBER) > 0)
          {
             OpenOrderLogic();       
          }
@@ -118,29 +119,62 @@ void OpenOrderLogic()
       {
          /**
          * Move stop loss to open price if profit already hits stop loss pts
+         * If stop loss has already been moved, trail stop by X-step
          */
          if (OrderType() == OP_BUY)
          {
             int currentDistance = GetDistanceInPoints(Bid, OrderOpenPrice());
 
-            if (currentDistance > sellOrderStopLossPts && OrderStopLoss() != OrderOpenPrice())
+            if (OrderStopLoss() < OrderOpenPrice())
             {
-               ModifyOrder(buyOrderTicket, OrderOpenPrice(), 0);
+               if (currentDistance > sellOrderStopLossPts)
+               {
+                  ModifyOrder(buyOrderTicket, OrderOpenPrice(), 0);
+                  int result = PartialCloseOrder(buyOrderTicket, Bid, FixedStaticLotSize, PartialClosePercent);
+
+                  if (result != CERR_PARTIAL_CLOSE_FAILED)
+                  {
+                     buyOrderTicket = result;
+                  }
+               }
             }
+            else
+            {
+               if (GetDistanceInPoints(Bid, OrderStopLoss()) > (MaxLossPts + TrailStep))
+               {
+                  ModifyOrder(buyOrderTicket, NormalizeDouble(OrderStopLoss() + (TrailStep * Point), DIGIT), 0);
+               }
+            }  
          }
          else if (OrderType() == OP_SELL)
          {
             int currentDistance = GetDistanceInPoints(OrderOpenPrice(), Ask);
-         
-            if (currentDistance > sellOrderStopLossPts && OrderStopLoss() != OrderOpenPrice())
+
+            if (OrderStopLoss() > OrderOpenPrice())
             {
-               ModifyOrder(sellOrderTicket, OrderOpenPrice(), 0);
+               if (currentDistance > sellOrderStopLossPts)
+               {
+                  ModifyOrder(sellOrderTicket, OrderOpenPrice(), 0);
+                  int result = PartialCloseOrder(sellOrderTicket, Ask, FixedStaticLotSize, PartialClosePercent);
+
+                  if (result != CERR_PARTIAL_CLOSE_FAILED)
+                  {
+                     sellOrderTicket = result;
+                  }
+               }
             }
+            else
+            {
+               if (GetDistanceInPoints(OrderStopLoss(), Ask) > (MaxLossPts + TrailStep))
+               {
+                  ModifyOrder(sellOrderTicket, NormalizeDouble(OrderStopLoss() - (TrailStep * Point), DIGIT), 0);
+               }
+            }        
          }
       }
       else
       {
-         Print("Order cannot be selected from OpenOrderLogic with ", GetLastError());
+         Print("Order cannot be selected from OpenOrderLogic with error ", GetLastError());
       }
    }
 }
@@ -194,7 +228,7 @@ void TradeLogic()
 
 void CheckOpenOrder()
 {
-   if (OrdersTotal() == 0)
+   if (GetTotalOrderCount(Symbol(), MAGIC_NUMBER) == 0)
    {
       if (buyOrderTicket > 0)
       {
