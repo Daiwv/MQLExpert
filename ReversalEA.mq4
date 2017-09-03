@@ -9,13 +9,13 @@
 #property strict
 
 #include <OrderLib.mqh>
+#include <MoneyLib.mqh>
 
 const string      EA_NAME = "KrishaScalper v0.1";
 const int         MAGIC_NUMBER = 20160811;
 
 sinput string     TradeManagement;
-input bool        UseMoneyManagement = false;
-input double      FixedStaticLotSize = 0.1;
+input double      RiskPercent = 3.0;
 input double      PartialClosePercent = 60.0;
 input int         MaxTradeSpreadPts = 10;
 input int         MaxLossPts = 100;
@@ -29,15 +29,15 @@ sinput string     BrokerInformation;
 input bool        IsECNBroker = true;
 
 sinput string     IndicatorSettings;
-input double      MinPiercePenetration=50.0;
-input double      MinBodySize=60.0;
-input double      MaxPinbarSize=25.0;
 input int         ATRPeriod=14;
+input int         EMAPeriod=20;
 
 int               buyOrderTicket = 0;
 int               sellOrderTicket = 0;
 int               buyOrderStopLossPts = 0;
 int               sellOrderStopLossPts = 0;
+double            buyOrderRiskedLot = 0.0;
+double            sellOrderRiskedLot = 0.0;
 int               bars_onchart;
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -102,14 +102,10 @@ void OpenOrderLogic()
    int ticket = 0;
 
    if (buyOrderTicket > 0)
-   {
       ticket = buyOrderTicket;
-   }
 
    if (sellOrderTicket > 0)
-   {
       ticket = sellOrderTicket;
-   }
 
    if (ticket > 0)
    {
@@ -130,17 +126,15 @@ void OpenOrderLogic()
                if (currentDistance > sellOrderStopLossPts)
                {
                   ModifyOrder(buyOrderTicket, OrderOpenPrice(), 0);
-                  int result = PartialCloseOrder(buyOrderTicket, Bid, FixedStaticLotSize, PartialClosePercent);
+                  int result = PartialCloseOrder(buyOrderTicket, Bid, buyOrderRiskedLot, PartialClosePercent);
 
                   if (result != CERR_PARTIAL_CLOSE_FAILED)
-                  {
                      buyOrderTicket = result;
-                  }
                }
             }
             else
             {
-               if (GetDistanceInPoints(Bid, OrderStopLoss()) > (MaxLossPts + TrailStep))
+               if (GetDistanceInPoints(Bid, OrderStopLoss()) > (buyOrderStopLossPts + TrailStep))
                {
                   ModifyOrder(buyOrderTicket, NormalizeDouble(OrderStopLoss() + (TrailStep * Point), DIGIT), 0);
                }
@@ -155,17 +149,15 @@ void OpenOrderLogic()
                if (currentDistance > sellOrderStopLossPts)
                {
                   ModifyOrder(sellOrderTicket, OrderOpenPrice(), 0);
-                  int result = PartialCloseOrder(sellOrderTicket, Ask, FixedStaticLotSize, PartialClosePercent);
+                  int result = PartialCloseOrder(sellOrderTicket, Ask, sellOrderRiskedLot, PartialClosePercent);
 
                   if (result != CERR_PARTIAL_CLOSE_FAILED)
-                  {
                      sellOrderTicket = result;
-                  }
                }
             }
             else
             {
-               if (GetDistanceInPoints(OrderStopLoss(), Ask) > (MaxLossPts + TrailStep))
+               if (GetDistanceInPoints(OrderStopLoss(), Ask) > (sellOrderStopLossPts + TrailStep))
                {
                   ModifyOrder(sellOrderTicket, NormalizeDouble(OrderStopLoss() - (TrailStep * Point), DIGIT), 0);
                }
@@ -182,22 +174,17 @@ void OpenOrderLogic()
 void TradeLogic()
 {
    int spread = GetSpread();
-   double up = iCustom(NULL, 0, "PIERCE", MinPiercePenetration, MinBodySize, MaxPinbarSize, 0, 1);
-   double down = iCustom(NULL, 0, "PIERCE", MinPiercePenetration, MinBodySize, MaxPinbarSize, 1, 1);
+   double ema = iMA(NULL, 0, EMAPeriod, 1,MODE_EMA, PRICE_CLOSE, 0);
    bool canOpenOrder = false;
 
    if (AllowTradeFrom == HOUR_0 && AllowTradeUntil == HOUR_0) // Can open trade anytime
-   {
       canOpenOrder = true;
-   }
    else // Limited to specific time only
    {
       int hour = Hour();
       
       if (hour >= AllowTradeFrom && hour < AllowTradeUntil)
-      {
          canOpenOrder = true;
-      }
    }
    
    if (canOpenOrder)
@@ -207,21 +194,24 @@ void TradeLogic()
        * - if calculated SL is smaller then max loss pts, use calculated SL
        * - if calculated SL is greater then max loss pts, use max loss pts
        */
-      if (up != EMPTY_VALUE)
+ 
+      if (Open[1] > ema && Close[1] < ema)
       {
          double highest = High[1] > High[2] ? High[1] : High[2];
          int tempStopLossPts = GetDistanceInPoints(highest + iATR(NULL, 0, ATRPeriod, 0), Bid, true);
          sellOrderStopLossPts = tempStopLossPts < MaxLossPts ? tempStopLossPts : MaxLossPts;
+         sellOrderRiskedLot = GetRiskedLotSize(RiskPercent, sellOrderStopLossPts);
 
-         sellOrderTicket = OpenOrder(Sell, IsECNBroker, FixedStaticLotSize, MAGIC_NUMBER, sellOrderStopLossPts, 0);
+         sellOrderTicket = OpenOrder(Sell, IsECNBroker, sellOrderRiskedLot, MAGIC_NUMBER, sellOrderStopLossPts, 0);
       }
-      else if (down != EMPTY_VALUE)
+      else if (Open[1] < ema && Close[1] > ema)
       {
          double lowest = Low[1] < Low[2] ? Low[1] : Low[2];
          int tempStopLossPts = GetDistanceInPoints(Ask, lowest - iATR(NULL, 0, ATRPeriod, 0), true);
          buyOrderStopLossPts = tempStopLossPts < MaxLossPts ? tempStopLossPts : MaxLossPts;
+         buyOrderRiskedLot = GetRiskedLotSize(RiskPercent, buyOrderStopLossPts);
 
-         buyOrderTicket = OpenOrder(Buy, IsECNBroker, FixedStaticLotSize, MAGIC_NUMBER, buyOrderStopLossPts, 0); 
+         buyOrderTicket = OpenOrder(Buy, IsECNBroker, buyOrderRiskedLot, MAGIC_NUMBER, buyOrderStopLossPts, 0);
       }
    }
 }
@@ -231,12 +221,8 @@ void CheckOpenOrder()
    if (GetTotalOrderCount(Symbol(), MAGIC_NUMBER) == 0)
    {
       if (buyOrderTicket > 0)
-      {
          buyOrderTicket = 0;
-      }
       if (sellOrderTicket > 0)
-      {
          sellOrderTicket = 0;
-      }
    }
 }
