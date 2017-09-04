@@ -10,6 +10,7 @@
 
 #include <OrderLib.mqh>
 #include <MoneyLib.mqh>
+#include <LogLib.mqh>
 
 const string      EA_NAME = "KrishaScalper v0.1";
 const int         MAGIC_NUMBER = 20160811;
@@ -44,13 +45,13 @@ int               bars_onchart;
 //+------------------------------------------------------------------+
 int OnInit()
   {
-   Print("Initialize ", EA_NAME);
+   Info("Initialize " + EA_NAME, __FILE__);
    
    if (ValidateInput()) {
       return(INIT_SUCCEEDED);
    }
    else {
-      Print("1 or more input parameter is wrong!");
+      Error("1 or more input parameter is wrong!", __FILE__);
       return(INIT_FAILED);
    }
   }
@@ -60,7 +61,7 @@ int OnInit()
 void OnDeinit(const int reason)
   {
 //---
-   Print("Destroying ", EA_NAME);
+   Info("Destroying " + EA_NAME, __FILE__);
   }
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -166,7 +167,7 @@ void OpenOrderLogic()
       }
       else
       {
-         Print("Order cannot be selected from OpenOrderLogic with error ", GetLastError());
+         Error("Order cannot be selected from OpenOrderLogic with error " + string(GetLastError()), __FILE__);
       }
    }
 }
